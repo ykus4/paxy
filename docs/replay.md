@@ -1,12 +1,12 @@
 # Replay & Fuzzing
 
-paxy can resend any captured request — once for manual re-testing, or hundreds of times in parallel for load testing and fuzzing.
+Resend any captured request as-is, or fire hundreds of parallel copies for load testing and fuzzing.
 
-## Replay from the Web UI
+## Replay from the GUI
 
-1. Click any entry in the traffic list to open the detail panel.
+1. Click any row in the traffic list to open the detail panel.
 2. Click the **Replay** button.
-3. The result (status code, body, duration) appears inline.
+3. The result (status code and body size) appears as a toast notification.
 
 ## Replay via API
 
@@ -27,7 +27,8 @@ Response:
     "entry_id": 42,
     "status_code": 200,
     "body": "...(base64)...",
-    "duration_ms": 134
+    "duration_ms": 134,
+    "error": ""
   }
 ]
 ```
@@ -37,7 +38,7 @@ Response:
 | Field | Type | Description |
 |-------|------|-------------|
 | `override_host` | string | Send to a different host (e.g. staging) |
-| `extra_headers` | object | Headers to add/override |
+| `extra_headers` | object | Headers to add or override |
 | `timeout_seconds` | int | Per-request timeout (default 30) |
 | `count` | int | Number of parallel replays (default 1) |
 
@@ -55,11 +56,11 @@ curl -X POST http://localhost:8081/api/replay \
   }'
 ```
 
-Returns an array of 100 results. Requests are fired concurrently.
+100 requests are issued concurrently via `asyncio.gather`. The response is an array of 100 results.
 
 ## Replay to a different host
 
-Useful for replaying production traffic against a staging environment:
+Useful for running production traffic against a staging environment:
 
 ```bash
 curl -X POST http://localhost:8081/api/replay \
@@ -72,7 +73,7 @@ curl -X POST http://localhost:8081/api/replay \
   }'
 ```
 
-## Adding headers
+## Replacing the auth token
 
 ```bash
 curl -X POST http://localhost:8081/api/replay \
@@ -81,8 +82,7 @@ curl -X POST http://localhost:8081/api/replay \
     "entry_id": 42,
     "options": {
       "extra_headers": {
-        "Authorization": "Bearer new-token",
-        "X-Test": "replay"
+        "Authorization": "Bearer new-token"
       }
     }
   }'

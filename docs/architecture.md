@@ -6,69 +6,85 @@
 ┌──────────────────────────────────────────────────────────┐
 │  Client (browser / mobile app)                           │
 └────────────────────────┬─────────────────────────────────┘
-                         │ HTTP or CONNECT
+                         │ HTTP / CONNECT
 ┌────────────────────────▼─────────────────────────────────┐
-│  internal/proxy  (port :8080)                            │
-│  ├─ HTTP handler → intercept → upstream                  │
-│  └─ CONNECT handler → TLS termination (MITM)            │
-│       ├─ HTTP/HTTPS → intercept → upstream               │
-│       ├─ WebSocket → internal/proto/ws                   │
-│       └─ gRPC → internal/proto/grpc                      │
+│  paxy/proxy/proxy.py  (port :8080)                       │
+│  asyncio TCP server                                      │
+│  ├─ HTTP  → intercept → forward upstream                 │
+│  ├─ CONNECT → terminate TLS (MITM)                       │
+│  │    ├─ HTTP/HTTPS → intercept → forward upstream       │
+│  │    ├─ WebSocket  → paxy/proto/ws.py                   │
+│  │    └─ gRPC       → paxy/proto/grpc.py                 │
+│  └─ ignored hosts → raw TCP tunnel (passthrough)         │
 └─────────────┬────────────────────────┬───────────────────┘
               │                        │
 ┌─────────────▼──────┐    ┌────────────▼──────────────────┐
-│  internal/cert     │    │  internal/interceptor          │
-│  CA + per-host TLS │    │  apply rules + record traffic  │
-└────────────────────┘    └────────────┬───────────────────┘
-                                       │
+│  paxy/cert/ca.py   │    │  paxy/interceptor/             │
+│  CA + per-host     │    │  apply rules, record entries   │
+│  SSL Context cache │    └────────────┬───────────────────┘
+└────────────────────┘                 │
                           ┌────────────▼───────────────────┐
-                          │  internal/store                │
+                          │  paxy/store/store.py           │
                           │  in-memory traffic store       │
-                          │  Pub/Sub for live updates      │
+                          │  asyncio pub/sub               │
                           └────────────┬───────────────────┘
                                        │
-┌──────────────────────────────────────▼───────────────────┐
-│  internal/api  (port :8081)                              │
-│  ├─ REST API  /api/traffic, /api/rules, /api/replay      │
-│  └─ WebSocket /ws  (streams new entries to browser)      │
-└──────────────────────────────────────────────────────────┘
+          ┌────────────────────────────┼──────────────────────┐
+          │                            │                      │
+┌─────────▼──────────┐   ┌─────────────▼─────────┐  ┌────────▼──────────┐
+│  paxy/api/         │   │  paxy/ui/app.py        │  │  paxy/ui/cui.py   │
+│  FastAPI REST API  │   │  NiceGUI browser UI    │  │  rich terminal UI │
+│  + WebSocket /ws   │   │  (GUI mode)            │  │  (CUI mode)       │
+└────────────────────┘   └────────────────────────┘  └───────────────────┘
 ```
 
-## Packages
+## Package overview
 
 | Package | Responsibility |
 |---------|----------------|
-| `cmd/paxy` | CLI entry point; wires all packages |
-| `internal/proxy` | HTTP server; plain HTTP forwarding; MITM for CONNECT |
-| `internal/cert` | Root CA generation; per-host certificate cache |
-| `internal/interceptor` | Reads request/response bodies; applies rule engine; records to store |
-| `internal/rule` | Rule evaluation engine; condition matching; priority ordering |
-| `internal/store` | In-memory traffic store; pub/sub for live WebSocket streaming |
-| `internal/api` | REST API + WebSocket server |
-| `internal/proto/ws` | WebSocket frame relay and logging |
-| `internal/proto/grpc` | gRPC length-prefix frame decoding |
-| `internal/script` | Lua scripting engine (gopher-lua) |
-| `internal/replay` | HTTP client for replaying captured entries |
-| `internal/config` | YAML config loading/saving |
+| `paxy/proxy` | asyncio TCP server; plain HTTP forwarding; TLS MITM for CONNECT; raw tunnel for ignored hosts |
+| `paxy/cert` | CA certificate generation; per-host SSL Context cache |
+| `paxy/interceptor` | Apply rules to requests and responses; record entries in the store |
+| `paxy/rule` | Rule evaluation engine; condition matching; priority ordering |
+| `paxy/store` | Thread-safe in-memory traffic store; asyncio pub/sub for live updates |
+| `paxy/api` | FastAPI REST endpoints and WebSocket streaming |
+| `paxy/ui/app` | NiceGUI browser UI (GUI mode) |
+| `paxy/ui/cui` | rich terminal UI (CUI mode) |
+| `paxy/proto/ws` | WebSocket frame relay and logging |
+| `paxy/proto/grpc` | gRPC length-prefix frame decoding |
+| `paxy/script` | Python script engine; `on_request` / `on_response` hooks |
+| `paxy/replay` | Async HTTP replay and parallel fuzzing via httpx |
+| `paxy/config` | YAML config loading |
 
 ## Key design decisions
 
-### TLS termination per connection
+### asyncio TCP server
 
-paxy generates a unique certificate for every hostname on first connection, signed by the local CA. Certificates are cached in memory for the process lifetime, so subsequent connections to the same host reuse the cached cert.
+The proxy is a raw `asyncio.start_server` TCP server that parses HTTP manually.
+This lets a single connection handle HTTP/1.1 keep-alive, CONNECT tunnels, and WebSocket upgrades
+without switching servers mid-connection.
 
-### In-memory store with Pub/Sub
+### TLS termination with `loop.start_tls()`
 
-All captured traffic lives in memory. Subscribers (WebSocket connections) receive a pointer to each entry as it is added or updated. This makes the live UI update latency near-zero, at the cost of losing history on restart.
+After responding `200 Connection Established` to a CONNECT request, paxy calls `loop.start_tls()`
+to upgrade the existing asyncio transport to TLS server-side. This avoids creating a second connection
+and keeps the code path simple. Per-host certificates are cached as `ssl.SSLContext` objects so they
+are only generated once per hostname per process lifetime.
 
-### Rule engine is evaluated twice
+### Store pub/sub across threads
 
-Rules are evaluated on both the request and the response. A modify rule can change request headers before forwarding and also change response bodies on the way back. The same rule set handles both passes; the `target` field on each modification (`req_header`, `resp_header`, `req_body`, `resp_body`) determines which pass it takes effect on.
+The proxy runs in the asyncio event loop. When it calls `store.add()` or `store.update()` from a
+coroutine, the store uses `loop.call_soon_threadsafe` to push the entry into each subscriber's
+`asyncio.Queue`. The UI and API layers `await` these queues to receive live updates with no polling.
 
-### bufResponseWriter for HTTPS connections
+### GUI vs CUI startup
 
-Inside a CONNECT tunnel, paxy is handed a raw `net.Conn` — not an `http.ResponseWriter`. `bufResponseWriter` wraps the conn to satisfy the `http.ResponseWriter` and `http.Hijacker` interfaces, letting the same `handleHTTP` function serve both plain HTTP and decrypted HTTPS connections.
+In **GUI mode**, `ui.run()` owns the event loop and the proxy is launched via `nicegui_app.on_startup`.
+In **CUI mode**, `asyncio.run()` owns the loop and `asyncio.gather` runs the proxy, uvicorn API server,
+and rich TUI concurrently. Both modes expose the same REST API at `:8081`.
 
-### Lua runs in a single state
+### Python script engine
 
-The Lua engine is not goroutine-safe. The current implementation runs all script hooks from the same goroutine state. For high-throughput scenarios this is a bottleneck; a future version should maintain a pool of Lua states.
+Scripts are loaded with `importlib.util.spec_from_file_location` into their own module namespace.
+`on_request` and `on_response` are looked up by name and called if they exist.
+The full Python standard library and any installed packages are available with no extra configuration.

@@ -1,44 +1,47 @@
 # Configuration
 
-paxy can be configured via CLI flags or a YAML file. CLI flags override config file values.
+paxy can be configured via CLI flags or a YAML file. CLI flags take precedence over the config file.
 
 ## YAML config file
 
 ```bash
-./bin/paxy --config paxy.yaml
+uv run python main.py --config paxy.yaml
 ```
 
 ### Full example
 
 ```yaml
 proxy:
-  addr: ":8080"
-  # Hosts to skip MITM and tunnel directly (no TLS termination)
+  addr: "0.0.0.0"
+  port: 8080
+  # Hosts to pass through without MITM (certificate pinning, internal services, etc.)
   ignore:
     - pinned.example.com
     - internal.corp
-  # Maximum body size to capture (bytes). Larger bodies are truncated.
-  max_body: 1048576  # 1MB
+  # Maximum body size to capture, in bytes
+  max_body: 1048576  # 1 MB
 
 ca:
-  cert_path: /custom/path/ca-cert.pem
-  key_path:  /custom/path/ca-key.pem
+  cert_path: /custom/ca-cert.pem
+  key_path:  /custom/ca-key.pem
 
 ui:
-  addr: ":8081"
+  addr: "0.0.0.0"
+  port: 8081
 
 script:
-  path: /path/to/script.lua
+  path: /path/to/script.py
 ```
 
-## Reference
+## Field reference
 
 ### `proxy`
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `addr` | string | `:8080` | Proxy listen address |
-| `ignore` | []string | `[]` | Hosts to tunnel without MITM |
+| `addr` | string | `0.0.0.0` | Proxy listen address |
+| `port` | int | `8080` | Proxy port |
+| `ignore` | list | `[]` | Hosts to tunnel without MITM |
 | `max_body` | int | `1048576` | Max body bytes to capture |
 
 ### `ca`
@@ -52,34 +55,24 @@ script:
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `addr` | string | `:8081` | Web UI / API listen address |
+| `addr` | string | `0.0.0.0` | Web UI / API listen address |
+| `port` | int | `8081` | Web UI / API port |
 
 ### `script`
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `path` | string | — | Path to Lua script file |
+| `path` | string | — | Python script path |
 
 ## CLI flags
 
-CLI flags take precedence over the config file.
-
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--addr` | `:8080` | Proxy listen address |
-| `--ui-addr` | `:8081` | Web UI listen address |
+| `--mode` | `gui` | UI mode: `gui` or `cui` |
+| `--addr` | `0.0.0.0` | Proxy listen address |
+| `--port` | `8080` | Proxy port |
+| `--ui-addr` | `0.0.0.0` | Web UI / API address |
+| `--ui-port` | `8081` | Web UI / API port |
 | `--config` | — | Config file path |
-| `--script` | — | Lua script path |
-| `--ca-dir` | `~/.paxy` | Directory for CA cert/key |
-
-## Ignoring hosts
-
-Some apps use certificate pinning and will fail if paxy terminates their TLS connections. Add those hosts to the `ignore` list:
-
-```yaml
-proxy:
-  ignore:
-    - pinned-api.example.com
-```
-
-paxy will create a raw TCP tunnel for those hosts instead of intercepting.
+| `--script` | — | Python script path |
+| `--ca-dir` | `~/.paxy` | Directory to store CA cert and key |

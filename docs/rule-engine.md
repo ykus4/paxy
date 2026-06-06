@@ -1,6 +1,6 @@
 # Rule Engine
 
-Rules let you intercept, modify, block, or redirect traffic without writing code.
+Rules let you block, modify, or redirect traffic without writing code.
 
 ## Rule structure
 
@@ -21,24 +21,24 @@ Rules let you intercept, modify, block, or redirect traffic without writing code
 
 | Action | Effect |
 |--------|--------|
-| `passthrough` | Allow without change (useful to whitelist over a broader rule) |
+| `passthrough` | Allow without change (useful for whitelisting over a broader rule) |
 | `block` | Return HTTP 403 to the client |
-| `modify` | Apply `modifications` to the request/response |
+| `modify` | Apply `modifications` to the request and/or response |
 | `redirect` | Return HTTP 302 to `redirect_url` |
 
 ## Conditions
 
-Each condition has a `field`, `op`, and `value`. All conditions in a rule must match (AND logic).
+All conditions in a rule must match (AND logic). Use multiple rules if you need OR logic.
 
 ### Fields
 
-| Field | Matches against |
-|-------|----------------|
-| `host` | `Host` header value |
+| Field | Evaluated against |
+|-------|------------------|
+| `host` | Host header |
 | `path` | URL path |
 | `method` | HTTP method |
 | `header` | Any header value (format: `Header-Name: value`) |
-| `body` | Request body as string |
+| `body` | Request body as a string |
 
 ### Operators
 
@@ -46,8 +46,8 @@ Each condition has a `field`, `op`, and `value`. All conditions in a rule must m
 |----|-------------|
 | `equals` | Exact match |
 | `contains` | Substring match |
-| `prefix` | String starts with value |
-| `regex` | Go-compatible regular expression |
+| `prefix` | Starts with |
+| `regex` | Python `re`-compatible regular expression |
 
 Set `"negate": true` to invert any condition.
 
@@ -81,27 +81,27 @@ Used with `action: modify`.
 |--------|-------------|
 | `req_header` | Request header |
 | `resp_header` | Response header |
-| `req_body` | Request body (replaces the whole body) |
+| `req_body` | Request body |
 | `resp_body` | Response body |
 
 ### Operations
 
 | Operation | Description |
 |-----------|-------------|
-| `set` | Set header key to value |
+| `set` | Set header key to value (overwrites) |
 | `delete` | Delete header key |
 | `append` | Append value to header |
-| `replace` | Replace entire body with value |
-| `find_replace` | Find/replace in body (`find` + `replace` fields) |
+| `replace` | Replace entire body with `value` |
+| `find_replace` | Replace `find` with `replace` in body |
 
 ## Priority
 
-Higher `priority` number = evaluated first. When two rules match, the one with higher priority wins.
+Higher `priority` = evaluated first. When multiple rules match, only the highest-priority rule fires.
 
 ## Managing rules via API
 
 ```bash
-# Create a rule
+# Create
 curl -X POST http://localhost:8081/api/rules \
   -H 'Content-Type: application/json' \
   -d '{
@@ -113,11 +113,13 @@ curl -X POST http://localhost:8081/api/rules \
     "modifications": [{"target": "req_header", "key": "X-Debug", "value": "true", "operation": "set"}]
   }'
 
-# List rules
+# List
 curl http://localhost:8081/api/rules
 
 # Update rule 1
-curl -X PUT http://localhost:8081/api/rules/1 -H 'Content-Type: application/json' -d '{"enabled": false, ...}'
+curl -X PUT http://localhost:8081/api/rules/1 \
+  -H 'Content-Type: application/json' \
+  -d '{"enabled": false, ...}'
 
 # Delete rule 1
 curl -X DELETE http://localhost:8081/api/rules/1

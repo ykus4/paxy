@@ -1,10 +1,16 @@
-.PHONY: build build-all web-install web-build web-dev test run clean
+.PHONY: install run dev web-install web-build web-dev test lint clean docs-dev docs-build
 
-build:
-	go build -o bin/paxy ./cmd/paxy
+install:
+	uv sync
 
-build-all: build web-build
-	go build -o bin/paxy ./cmd/paxy
+run:
+	uv run python main.py
+
+gui:
+	uv run python main.py --mode gui
+
+cui:
+	uv run python main.py --mode cui
 
 web-install:
 	cd web && npm install
@@ -16,10 +22,16 @@ web-dev:
 	cd web && npm run dev
 
 test:
-	go test ./...
+	uv run pytest tests/ -v
 
-run:
-	go run ./cmd/paxy
+lint:
+	uv run ruff check paxy/
 
 clean:
-	rm -rf bin/ web/dist/
+	rm -rf __pycache__ paxy/**/__pycache__ .pytest_cache site/ web/dist/
+
+docs-dev:
+	mkdocs serve
+
+docs-build:
+	mkdocs build

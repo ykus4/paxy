@@ -2,46 +2,54 @@
 
 ## Requirements
 
-- Go 1.21+
-- Node.js 18+ (for Web UI development)
+- Python 3.11+
+- [uv](https://docs.astral.sh/uv/)
 
 ## Installation
-
-### From source
 
 ```bash
 git clone https://github.com/ykus4/paxy
 cd paxy
-make build
+uv sync
 ```
 
-The binary is placed at `bin/paxy`.
+## Running
 
-### Run without building
+### GUI mode (default)
 
 ```bash
-make run
+uv run python main.py
+# or
+make gui
 ```
 
-## First launch
+Open `http://localhost:8081` in your browser to see the traffic viewer.
+
+### CUI mode
 
 ```bash
-./bin/paxy
+uv run python main.py --mode cui
+# or
+make cui
 ```
 
-Output:
+A real-time traffic table renders directly in the terminal.
+
+## Startup output
 
 ```
 paxy MITM proxy
-  proxy addr : :8080
-  UI addr    : :8081
-  CA cert    : /Users/you/.paxy/ca-cert.pem
+  proxy : 0.0.0.0:8080
+  UI    : http://0.0.0.0:8081
+  CA    : /Users/you/.paxy/ca-cert.pem
 Install the CA cert in your browser/device to avoid TLS warnings.
 ```
 
-On first run paxy generates a CA certificate at `~/.paxy/ca-cert.pem`. You need to install this certificate as a trusted CA on every device whose traffic you want to inspect.
+On first run, `~/.paxy/ca-cert.pem` and `~/.paxy/ca-key.pem` are generated automatically.
 
-## Install the CA certificate
+## Installing the CA certificate
+
+To intercept HTTPS traffic, install the generated CA certificate as a trusted root on every device you want to inspect.
 
 ### macOS (system-wide)
 
@@ -50,37 +58,31 @@ sudo security add-trusted-cert -d -r trustRoot \
   -k /Library/Keychains/System.keychain ~/.paxy/ca-cert.pem
 ```
 
-### macOS (Chrome / Safari — via Keychain Access)
-
-1. Open **Keychain Access**
-2. Drag `~/.paxy/ca-cert.pem` into the **System** keychain
-3. Double-click the imported certificate → **Trust** → **Always Trust**
-
 ### Firefox
 
-1. Open **Settings** → **Privacy & Security** → **Certificates** → **View Certificates**
-2. **Authorities** tab → **Import** → select `~/.paxy/ca-cert.pem`
+1. **Settings** → **Privacy & Security** → **View Certificates** → **Authorities**
+2. **Import** → select `~/.paxy/ca-cert.pem`
 3. Check **Trust this CA to identify websites**
 
 ### Android
 
-1. Copy `ca-cert.pem` to the device (email, ADB, etc.)
+1. Transfer `ca-cert.pem` to the device
 2. **Settings** → **Security** → **Install from storage**
-3. Select the file and name it `paxy`
 
-For Android 7+, apps targeting API 24+ do not trust user-installed CAs by default.
-Add a `network_security_config.xml` to the target app, or use a rooted device.
+!!! note
+    Android 7+ apps targeting API 24+ do not trust user-installed CAs by default.
+    Add a `network_security_config.xml` to the target app, or use a rooted device.
 
 ### iOS
 
-1. Email the certificate to the device or serve it over HTTP
+1. Send the certificate to the device via email or HTTP
 2. Open the attachment — iOS prompts to install a profile
 3. **Settings** → **General** → **VPN & Device Management** → install the profile
 4. **Settings** → **General** → **About** → **Certificate Trust Settings** → enable full trust
 
-## Configure the proxy
+## Configuring the proxy
 
-### Browser (macOS system proxy)
+### macOS (system proxy)
 
 ```bash
 networksetup -setwebproxy Wi-Fi 127.0.0.1 8080
@@ -96,7 +98,7 @@ networksetup -setsecurewebproxystate Wi-Fi off
 
 ### Android
 
-**Settings** → **Wi-Fi** → long-press your network → **Modify network** → **Advanced** → **Proxy: Manual**
+**Settings** → **Wi-Fi** → long-press your network → **Modify** → **Advanced** → **Proxy: Manual**
 
 - Host: your machine's IP (e.g. `192.168.1.10`)
 - Port: `8080`
@@ -107,9 +109,3 @@ networksetup -setsecurewebproxystate Wi-Fi off
 
 - Server: your machine's IP
 - Port: `8080`
-
-## Open the Web UI
-
-Navigate to [http://localhost:8081](http://localhost:8081) in your browser.
-
-Traffic appears in real time as requests pass through the proxy.

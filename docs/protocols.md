@@ -2,52 +2,77 @@
 
 ## WebSocket
 
-WebSocket connections are automatically detected and intercepted when a CONNECT tunnel is upgraded.
+WebSocket connections are detected automatically and intercepted as part of the HTTPS MITM flow.
 
 ### How it works
 
-1. Client sends a CONNECT request to the proxy.
-2. paxy establishes a TLS tunnel (same as HTTPS MITM).
-3. When paxy sees an `Upgrade: websocket` header in the decrypted stream, it switches to WebSocket frame relay mode.
-4. Each frame is logged with direction (`client` / `server`), opcode, and payload.
+1. The client sends a CONNECT request to the proxy.
+2. paxy terminates TLS (same as HTTPS MITM).
+3. When paxy sees `Upgrade: websocket` in the decrypted stream, it switches to WebSocket relay mode.
+4. Frames are relayed between client and server while being logged.
 
-### In the Web UI
+### Frame logging
 
-WebSocket entries appear in the traffic list with the `websocket` tag and protocol `ws`.
+```
+ws frame entry=12 dir=client text={"type":"ping"}
+ws frame entry=12 dir=server text={"type":"pong"}
+```
 
-The entry captures the upgrade request. Individual frames are logged to the paxy console.
+### In the UI
+
+WebSocket connections appear in the traffic list with the `websocket` tag and `ws` protocol.
+Individual frames are logged to the console. Per-frame display in the UI is planned for a future release.
 
 ### Limitations
 
-- Frame-level interception is read-only in this version. Modifying individual frames requires a Lua script.
-- Compressed WebSocket frames (permessage-deflate) are relayed as-is.
+- Frame-level modification is not yet supported in the rule engine. Use a Python script hook instead.
+- `permessage-deflate` compressed frames are relayed as-is without decompression.
+
+---
 
 ## gRPC
 
-gRPC uses HTTP/2 over TLS with a length-prefixed binary framing. paxy detects gRPC by the `Content-Type: application/grpc` header.
+gRPC uses HTTP/2 over TLS with a 5-byte length-prefix framing.
+paxy detects it via the `Content-Type: application/grpc` header.
 
 ### How it works
 
-1. The HTTPS MITM terminates TLS normally.
-2. paxy detects the `application/grpc` content type on the request or response.
-3. The 5-byte length-prefix header is decoded: 1 byte compressed flag + 4 bytes message length.
-4. Frame metadata (compressed, length) is logged per request.
+1. TLS is terminated normally as part of HTTPS MITM.
+2. The `application/grpc` content type triggers frame decoding.
+3. Each frame's metadata (compressed flag, length) is logged.
 
-### In the Web UI
+### Frame logging
 
-gRPC entries appear with the `grpc` tag. The raw binary body is stored in the entry for inspection.
-
-### Protobuf decoding
-
-paxy stores the raw protobuf bytes. To decode them into readable fields you need the `.proto` schema. A future version will support schema registration and automatic decoding.
-
-For now, use a tool like `protoc` or `grpcurl` with the captured bytes:
-
-```bash
-# Decode a captured body (base64-encoded in the API response)
-echo "<base64-body>" | base64 -d | protoc --decode_raw
+```
+grpc frame entry=7 dir=request  index=0 compressed=False len=42
+grpc frame entry=7 dir=response index=0 compressed=False len=128
 ```
 
-## Plain TCP / binary protocols
+### Decoding Protobuf
 
-For other binary protocols, paxy's tunnel mode passes through the raw TCP stream without modification. Use the `ignore` list in the config to skip MITM for specific hosts if needed.
+paxy stores raw bytes. Use external tooling to decode:
+
+```bash
+# Fetch the entry, decode the base64 body, pipe to protoc
+curl -s http://localhost:8081/api/traffic/7 \
+  | python3 -c "
+import sys, json, base64
+d = json.load(sys.stdin)
+print(base64.b64decode(d['req_body']).hex())
+"
+```
+
+---
+
+## Certificate pinning
+
+Apps that use certificate pinning will reject paxy's dynamically generated certificate.
+Add those hosts to the `ignore` list in the config to tunnel them through without MITM:
+
+```yaml
+proxy:
+  ignore:
+    - pinned-api.example.com
+```
+
+paxy will create a raw TCP tunnel for ignored hosts instead of intercepting them.

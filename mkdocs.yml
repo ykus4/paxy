@@ -49,10 +49,11 @@ plugins:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
-  - Web UI: web-ui.md
+  - UI:
+      - Web UI & CUI: web-ui.md
   - Features:
       - Rule Engine: rule-engine.md
-      - Lua Scripting: lua-scripting.md
+      - Python Scripting: scripting.md
       - Replay & Fuzzing: replay.md
       - gRPC & WebSocket: protocols.md
   - Reference:
