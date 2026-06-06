@@ -1,5 +1,63 @@
 # Protocol Support
 
+## GraphQL
+
+paxy automatically detects GraphQL requests and provides dedicated tooling.
+
+### Detection
+
+A request is identified as GraphQL when any of these conditions are met:
+
+- `Content-Type: application/graphql`
+- POST body is JSON with a `query` key whose value starts with `query`, `mutation`, `subscription`, or `{`
+- GET request with a `query=` parameter
+- Path matches `/graphql` (case-insensitive)
+
+Detected entries are tagged `graphql` and shown with `protocol = graphql` in the traffic list.
+
+### GraphQL tab
+
+Open the **GraphQL** tab or right-click a GraphQL entry → **Open in GraphQL tab**.
+
+**Schema Introspection**
+
+Enter the endpoint URL and click **Introspect**. paxy sends a full `__schema` introspection query and displays the type tree. The schema is cached per-host and available for query completion.
+
+**Query Editor**
+
+When an entry is opened, the query and variables are auto-filled from the captured request. Edit and re-run with the **Run Query** button.
+
+**Operation Analysis**
+
+Shows the operation type (query/mutation/subscription), operation name, and top-level fields of the selected entry.
+
+### API
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /api/graphql/introspect` | Fetch schema from `{"url": "...", "headers": {...}}` |
+| `GET /api/graphql/schemas` | List cached schemas by host |
+| `GET /api/graphql/schema/{host}` | Get full schema for a host |
+| `DELETE /api/graphql/schema/{host}` | Remove cached schema |
+| `POST /api/graphql/replay` | Re-send with modified query/variables |
+
+### Modifier utilities (`paxy.graphql.modifier`)
+
+```python
+from paxy.graphql.modifier import set_variable, build_query, build_mutation
+
+# Replace a variable in a captured request body
+new_body = set_variable(entry.req_body, "userId", "456")
+
+# Build a query programmatically
+body = build_query(["user { id name }", "posts { title }"])
+
+# Build a mutation
+body = build_mutation("createUser", {"name": "alice"}, ["id", "name"])
+```
+
+---
+
 ## WebSocket
 
 WebSocket connections are detected automatically and intercepted as part of the HTTPS MITM flow.
@@ -11,17 +69,9 @@ WebSocket connections are detected automatically and intercepted as part of the 
 3. When paxy sees `Upgrade: websocket` in the decrypted stream, it switches to WebSocket relay mode.
 4. Frames are relayed between client and server while being logged.
 
-### Frame logging
+### Frame intercept
 
-```
-ws frame entry=12 dir=client text={"type":"ping"}
-ws frame entry=12 dir=server text={"type":"pong"}
-```
-
-### Limitations
-
-- Frame-level modification is not yet supported in the rule engine. Use a Python script hook instead.
-- `permessage-deflate` compressed frames are relayed as-is without decompression.
+Enable `WSInterceptManager` to pause individual frames for manual review, similar to HTTP intercept. Forward with or without payload edits, or drop entirely.
 
 ---
 
@@ -30,23 +80,7 @@ ws frame entry=12 dir=server text={"type":"pong"}
 gRPC uses HTTP/2 over TLS with a 5-byte length-prefix framing.
 paxy detects it via the `Content-Type: application/grpc` header.
 
-### How it works
-
-1. TLS is terminated normally as part of HTTPS MITM.
-2. The `application/grpc` content type triggers frame decoding.
-3. Each frame's metadata (compressed flag, length) is logged.
-
-### Decoding Protobuf
-
-paxy stores raw bytes and can decode them without a `.proto` schema using wire-type heuristics.
-In the detail panel, select **Protobuf** from the body view dropdown.
-
-```
-field 1 (varint): 42
-field 2 (string): 'hello'
-field 3 (embedded):
-  field 1 (varint): 100
-```
+The body view selector in the detail panel offers **Protobuf** mode for wire-type heuristic decoding (no schema needed).
 
 ---
 
@@ -54,52 +88,28 @@ field 3 (embedded):
 
 MQTT connections over TLS are detected by inspecting the first packet for the MQTT protocol name (`MQTT` or `MQIsdp`).
 
-### Frame logging
-
-```
-mqtt frame entry=5 dir=client type=PUBLISH topic='sensors/temp' qos=1 len=12
-mqtt frame entry=5 dir=server type=PUBACK topic='' qos=0 len=2
-```
-
-### Packet types
-
-`CONNECT`, `CONNACK`, `PUBLISH`, `PUBACK`, `PUBREC`, `PUBREL`, `PUBCOMP`,
-`SUBSCRIBE`, `SUBACK`, `UNSUBSCRIBE`, `UNSUBACK`, `PINGREQ`, `PINGRESP`, `DISCONNECT`
+All 14 packet types are decoded: `CONNECT`, `CONNACK`, `PUBLISH`, `PUBACK`, `PUBREC`, `PUBREL`, `PUBCOMP`, `SUBSCRIBE`, `SUBACK`, `UNSUBSCRIBE`, `UNSUBACK`, `PINGREQ`, `PINGRESP`, `DISCONNECT`.
 
 ---
 
-## MessagePack
+## MessagePack / CBOR
 
-When the `Content-Type` contains `msgpack`, or when auto-detection identifies MessagePack encoding, the body is decoded to JSON for display.
-
-Select **MessagePack** in the body view dropdown to force MessagePack decoding.
+When the `Content-Type` contains `msgpack` or `cbor`, or when auto-detection identifies the encoding, the body is decoded to JSON for display. Select the mode explicitly in the body view dropdown.
 
 ---
 
-## CBOR
+## HTTP/2
 
-CBOR (Concise Binary Object Representation) is decoded to JSON for display.
-Select **CBOR** in the body view dropdown.
+All upstream requests use `httpx` with HTTP/2 support enabled. Connections negotiate HTTP/2 via ALPN automatically.
 
 ---
 
 ## Certificate pinning
 
-Apps that use certificate pinning will reject paxy's dynamically generated certificate.
-Add those hosts to the `ignore` list in the config, or use the SSL Passthrough panel in Settings:
+Add pinned hosts to the `ignore` list in config or the **SSL Passthrough** settings tab. paxy tunnels those hosts without TLS interception.
 
 ```yaml
 proxy:
   ignore:
     - pinned-api.example.com
 ```
-
-paxy will create a raw TCP tunnel for ignored hosts instead of intercepting them.
-
----
-
-## HTTP/2
-
-paxy uses `httpx` with HTTP/2 support enabled. Connections to servers that support HTTP/2 will automatically use it via ALPN negotiation. The Resender and Bulk Sender also use HTTP/2 automatically.
-
-There is no HTTP/2 framing interception at the proxy level — HTTP/2 traffic is decoded to HTTP/1.1 semantics before recording.
