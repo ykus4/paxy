@@ -47,8 +47,10 @@ def build_openapi_tab(store: Store) -> None:
             copy_btn = ui.button("Copy", icon="content_copy").props("flat size=sm")
             copy_btn.on(
                 "click",
-                lambda: ui.run_javascript(f"navigator.clipboard.writeText({spec_area.value!r})")
-                or ui.notify("Copied!", type="positive"),
+                lambda: (
+                    ui.run_javascript(f"navigator.clipboard.writeText({spec_area.value!r})")
+                    or ui.notify("Copied!", type="positive")
+                ),
             )
 
         def _generate() -> None:

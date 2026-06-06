@@ -34,8 +34,10 @@ def build_codegen_tab(store: Store) -> dict:
             copy_btn = ui.button("Copy", icon="content_copy").props("flat size=sm")
             copy_btn.on(
                 "click",
-                lambda: ui.run_javascript(f"navigator.clipboard.writeText({code_area.value!r})")
-                or ui.notify("Copied!", type="positive"),
+                lambda: (
+                    ui.run_javascript(f"navigator.clipboard.writeText({code_area.value!r})")
+                    or ui.notify("Copied!", type="positive")
+                ),
             )
 
         def _generate() -> None:
