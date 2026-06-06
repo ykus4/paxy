@@ -28,10 +28,7 @@ def is_graphql(entry: Entry) -> bool:
         return True
 
     # common GraphQL paths
-    if re.search(r"/graphql", entry.path, re.IGNORECASE):
-        return True
-
-    return False
+    return bool(re.search(r"/graphql", entry.path, re.IGNORECASE))
 
 
 def parse_operation(body: bytes) -> dict:
