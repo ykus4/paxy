@@ -128,7 +128,7 @@ def _render_tab(tab: dict, state: dict, container: ui.element) -> None:
                 except Exception:
                     body_text = resp.text
                 result_area.value = (
-                    f"HTTP {resp.status_code} ({resp.elapsed.total_seconds()*1000:.0f}ms)\n"
+                    f"HTTP {resp.status_code} ({resp.elapsed.total_seconds() * 1000:.0f}ms)\n"
                     + "\n".join(f"{k}: {v}" for k, v in resp.headers.items())
                     + f"\n\n{body_text}"
                 )
