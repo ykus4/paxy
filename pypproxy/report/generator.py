@@ -26,12 +26,12 @@ def generate_html(
     for e in entries[:500]:
         ct = e.resp_headers.get("content-type", [""])[0][:40]
         rows.append(f"""
-        <tr class="{'err' if e.status_code >= 400 else ''}">
+        <tr class="{"err" if e.status_code >= 400 else ""}">
           <td>{e.id}</td>
           <td><span class="badge m-{e.method.lower()}">{e.method}</span></td>
           <td class="mono">{e.host}{e.path[:60]}</td>
-          <td><span class="badge s-{e.status_code // 100}">{e.status_code or '—'}</span></td>
-          <td>{e.duration_ms or '—'} ms</td>
+          <td><span class="badge s-{e.status_code // 100}">{e.status_code or "—"}</span></td>
+          <td>{e.duration_ms or "—"} ms</td>
           <td>{len(e.resp_body):,} B</td>
           <td class="ct">{ct}</td>
         </tr>""")
@@ -40,10 +40,10 @@ def generate_html(
     for f in vulns:
         vuln_rows.append(f"""
         <tr>
-          <td><span class="badge s-4">{f.get('check', f.get('category', ''))}</span></td>
-          <td class="mono">{f.get('param', f.get('url', ''))}</td>
-          <td>{f.get('detail', f.get('description', ''))}</td>
-          <td class="mono">{str(f.get('evidence', f.get('reason', '')))[:100]}</td>
+          <td><span class="badge s-4">{f.get("check", f.get("category", ""))}</span></td>
+          <td class="mono">{f.get("param", f.get("url", ""))}</td>
+          <td>{f.get("detail", f.get("description", ""))}</td>
+          <td class="mono">{str(f.get("evidence", f.get("reason", "")))[:100]}</td>
         </tr>""")
 
     return f"""<!DOCTYPE html>
