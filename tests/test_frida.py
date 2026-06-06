@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
+from pypproxy.frida.device import FridaManager
 from pypproxy.frida.hook_generator import generate_parameter_hook, generate_request_logger
 from pypproxy.frida.pinning_bypass import (
     ANDROID_BYPASS_OKHTTP,
@@ -160,3 +163,69 @@ def test_request_logger_includes_observed_hosts():
     result = generate_request_logger(entries, "okhttp3")
     assert "api.example.com" in result
     assert "cdn.example.com" in result
+
+
+# ---- FridaManager ----
+
+
+def test_frida_manager_is_available_returns_bool():
+    mgr = FridaManager()
+    result = mgr.is_available()
+    assert isinstance(result, bool)
+
+
+def test_frida_manager_list_devices_no_frida():
+    """When frida is not installed, list_devices should return empty list gracefully."""
+    mgr = FridaManager()
+    if not mgr.is_available():
+        devices = mgr.list_devices()
+        assert isinstance(devices, list)
+        assert len(devices) == 0
+
+
+def test_frida_manager_list_processes_no_frida():
+    mgr = FridaManager()
+    if not mgr.is_available():
+        procs = mgr.list_processes("local")
+        assert isinstance(procs, list)
+        assert len(procs) == 0
+
+
+def test_frida_manager_list_sessions_empty():
+    mgr = FridaManager()
+    sessions = mgr.list_sessions()
+    assert isinstance(sessions, list)
+
+
+def test_frida_manager_detach_unknown_noop():
+    mgr = FridaManager()
+    # Should not raise even if session doesn't exist
+    mgr.detach("local", "com.nonexistent.app")
+
+
+@pytest.mark.asyncio
+async def test_frida_manager_inject_no_frida():
+    """Inject without frida installed returns error session gracefully."""
+    mgr = FridaManager()
+    if not mgr.is_available():
+        sess = await mgr.inject("local", "com.example.app", "console.log('test')")
+        assert sess.error != ""
+        assert not sess.running
+
+
+def test_device_info_to_dict():
+    from pypproxy.frida.device import DeviceInfo
+
+    d = DeviceInfo(id="abc123", name="iPhone", type="usb")
+    result = d.to_dict()
+    assert result == {"id": "abc123", "name": "iPhone", "type": "usb"}
+
+
+def test_process_info_to_dict():
+    from pypproxy.frida.device import ProcessInfo
+
+    p = ProcessInfo(pid=1234, name="MyApp", identifier="com.example.app")
+    result = p.to_dict()
+    assert result["pid"] == 1234
+    assert result["name"] == "MyApp"
+    assert result["identifier"] == "com.example.app"
