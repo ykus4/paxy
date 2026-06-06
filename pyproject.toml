@@ -11,7 +11,7 @@ dependencies = [
     "cryptography>=48.0.0",
     "PyYAML>=6.0.1",
     "nicegui>=3.12.1",
-    "rich>=13.0.0",
+    "rich>=15.0.0",
 ]
 
 [project.scripts]
