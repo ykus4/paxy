@@ -83,6 +83,10 @@ def build_ui(
             graphql_tab = ui.tab("GraphQL", icon="account_tree")
             codegen_tab = ui.tab("Code Gen", icon="code")
             frida_tab = ui.tab("Frida", icon="bug_report")
+            macro_tab = ui.tab("Macro", icon="playlist_play")
+            ab_tab = ui.tab("A/B Test", icon="compare")
+            session_tab = ui.tab("Sessions", icon="folder")
+            report_tab = ui.tab("Report", icon="summarize")
             openapi_tab_btn = ui.tab("OpenAPI", icon="description")
             analytics_tab_btn = ui.tab("Analytics", icon="bar_chart")
             import_tab_btn = ui.tab("Import/Search", icon="upload")
@@ -163,6 +167,26 @@ def build_ui(
 
                 frida_state = build_frida_tab(store)
 
+            with ui.tab_panel(macro_tab).classes("p-0 h-full"):
+                from .macro_tab import build_macro_tab
+
+                macro_state = build_macro_tab(store)
+
+            with ui.tab_panel(ab_tab).classes("p-0 h-full"):
+                from .ab_tab import build_ab_tab
+
+                ab_state = build_ab_tab(store)
+
+            with ui.tab_panel(session_tab).classes("p-0 h-full"):
+                from .session_tab import build_session_tab
+
+                session_state = build_session_tab(store)
+
+            with ui.tab_panel(report_tab).classes("p-0 h-full"):
+                from .report_tab import build_report_tab
+
+                build_report_tab(store)
+
             with ui.tab_panel(import_tab_btn).classes("p-0 h-full"):
                 from .import_tab import build_import_tab
 
@@ -236,6 +260,21 @@ def build_ui(
                         codegen_state["open_entry"](entry),
                         tabs.set_value(codegen_tab),
                     ),
+                )
+                ui.menu_item(
+                    "A/B Test",
+                    on_click=lambda: (ab_state["open_entry"](entry), tabs.set_value(ab_tab)),
+                )
+                ui.menu_item(
+                    "Add to Macro",
+                    on_click=lambda: (
+                        macro_state["open_entries"]([entry]),
+                        tabs.set_value(macro_tab),
+                    ),
+                )
+                ui.menu_item(
+                    "Add to Session",
+                    on_click=lambda: session_state["add_entry_to_active"](entry),
                 )
                 if "graphql" in (entry.tags or []):
                     ui.menu_item(
