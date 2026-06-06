@@ -9,7 +9,7 @@
 
 ```bash
 git clone https://github.com/ykus4/pypproxy
-cd paxy
+cd pypproxy
 uv sync
 ```
 

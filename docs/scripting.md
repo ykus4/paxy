@@ -17,7 +17,7 @@ script:
 
 ## Hook functions
 
-Define any of these functions in your script. paxy calls them automatically.
+Define any of these functions in your script. pypproxy calls them automatically.
 
 ### `on_request(method, host, path, body)`
 
@@ -90,7 +90,7 @@ def on_response(status: int, body: bytes) -> bytes:
 
 ## Notes
 
-- The script is loaded once at startup. Restart paxy to pick up changes.
+- The script is loaded once at startup. Restart pypproxy to pick up changes.
 - Both hooks may be called concurrently from multiple requests. Protect shared state with a lock if needed.
-- Use `sys.stderr` for logging to avoid mixing output with paxy's own logs.
+- Use `sys.stderr` for logging to avoid mixing output with pypproxy's own logs.
 - The full Python standard library and any packages in the project's virtualenv are available.

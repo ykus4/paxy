@@ -63,7 +63,7 @@ CRUD for intercept rules.
 | `GET /api/export/json` | Export all entries + rules as JSON |
 | `GET /api/export/har` | Export all entries as HAR 1.2 |
 | `POST /api/import/har` | Import entries from HAR body |
-| `POST /api/import/json` | Import entries from paxy JSON body |
+| `POST /api/import/json` | Import entries from pypproxy JSON body |
 | `POST /api/import/rules` | Import rules from JSON body |
 
 ---

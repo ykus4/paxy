@@ -2,14 +2,14 @@
 
 ## GUI Mode
 
-Start paxy in GUI mode (the default) and open `http://localhost:8081`.
+Start pypproxy in GUI mode (the default) and open `http://localhost:8081`.
 The UI is built with [NiceGUI](https://nicegui.io/) and runs in the same Python process as the proxy.
 
 ## Layout
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  toolbar: paxy ● | Filter expression | Intercept | Clear | ⚙ │
+│  toolbar: pypproxy ● | Filter expression | Intercept | Clear | ⚙ │
 ├─────────────────────────────────────────────────────────────-┤
 │  Traffic | Resender | Bulk Sender | Diff                      │
 ├──────────────────────────┬───────────────────────────────────┤

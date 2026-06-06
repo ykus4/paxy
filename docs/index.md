@@ -2,7 +2,7 @@
 layout: home
 
 hero:
-  name: paxy
+  name: pypproxy
   text: MITM Proxy
   tagline: Intercept, inspect, and modify HTTP/HTTPS traffic from browsers and mobile apps. Written in Python.
   actions:

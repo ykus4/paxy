@@ -5,7 +5,7 @@ paxy can be configured via CLI flags or a YAML file. CLI flags take precedence o
 ## YAML config file
 
 ```bash
-uv run python main.py --config paxy.yaml
+uv run python main.py --config pypproxy.yaml
 ```
 
 ### Full example

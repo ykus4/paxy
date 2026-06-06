@@ -21,7 +21,7 @@ Open the **GraphQL** tab or right-click a GraphQL entry → **Open in GraphQL ta
 
 **Schema Introspection**
 
-Enter the endpoint URL and click **Introspect**. paxy sends a full `__schema` introspection query and displays the type tree. The schema is cached per-host and available for query completion.
+Enter the endpoint URL and click **Introspect**. pypproxy sends a full `__schema` introspection query and displays the type tree. The schema is cached per-host and available for query completion.
 
 **Query Editor**
 
@@ -44,7 +44,7 @@ Shows the operation type (query/mutation/subscription), operation name, and top-
 ### Modifier utilities (`paxy.graphql.modifier`)
 
 ```python
-from paxy.graphql.modifier import set_variable, build_query, build_mutation
+from pypproxy.graphql.modifier import set_variable, build_query, build_mutation
 
 # Replace a variable in a captured request body
 new_body = set_variable(entry.req_body, "userId", "456")
@@ -65,8 +65,8 @@ WebSocket connections are detected automatically and intercepted as part of the 
 ### How it works
 
 1. The client sends a CONNECT request to the proxy.
-2. paxy terminates TLS (same as HTTPS MITM).
-3. When paxy sees `Upgrade: websocket` in the decrypted stream, it switches to WebSocket relay mode.
+2. pypproxy terminates TLS (same as HTTPS MITM).
+3. When pypproxy sees `Upgrade: websocket` in the decrypted stream, it switches to WebSocket relay mode.
 4. Frames are relayed between client and server while being logged.
 
 ### Frame intercept
@@ -106,7 +106,7 @@ All upstream requests use `httpx` with HTTP/2 support enabled. Connections negot
 
 ## Certificate pinning
 
-Add pinned hosts to the `ignore` list in config or the **SSL Passthrough** settings tab. paxy tunnels those hosts without TLS interception.
+Add pinned hosts to the `ignore` list in config or the **SSL Passthrough** settings tab. pypproxy tunnels those hosts without TLS interception.
 
 ```yaml
 proxy:
