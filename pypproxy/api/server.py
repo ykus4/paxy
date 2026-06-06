@@ -289,6 +289,89 @@ async def active_scan(req: ScanRequest) -> JSONResponse:
     return JSONResponse([r.to_dict() for r in results])
 
 
+# --- Report ---
+
+
+@app.get("/api/report/html")
+async def report_html(host: str = "", title: str = "pypproxy Report") -> PlainTextResponse:
+    assert _store is not None
+    from pypproxy.report.generator import generate_html
+    from pypproxy.store.models import Filter
+
+    f = Filter(host=host) if host else Filter()
+    entries, _ = _store.list(f, 0, 0)
+    return PlainTextResponse(generate_html(entries, title), media_type="text/html")
+
+
+@app.get("/api/report/markdown")
+async def report_markdown(host: str = "", title: str = "pypproxy Report") -> PlainTextResponse:
+    assert _store is not None
+    from pypproxy.report.generator import generate_markdown
+    from pypproxy.store.models import Filter
+
+    f = Filter(host=host) if host else Filter()
+    entries, _ = _store.list(f, 0, 0)
+    return PlainTextResponse(generate_markdown(entries, title), media_type="text/markdown")
+
+
+# --- Macro ---
+
+
+class MacroRunRequest(BaseModel):
+    steps: list[dict] = []
+    timeout: int = 30
+
+
+@app.post("/api/macro/run")
+async def run_macro(req: MacroRunRequest) -> JSONResponse:
+    from pypproxy.macro.runner import MacroRunner, MacroStep
+
+    steps = [MacroStep.from_dict(s) for s in req.steps]
+    runner = MacroRunner()
+    results = await runner.run(steps, timeout=req.timeout)
+    return JSONResponse([r.to_dict() for r in results])
+
+
+# --- IDOR ---
+
+
+@app.post("/api/idor")
+async def idor_check(data: dict) -> JSONResponse:
+    assert _store is not None
+    from pypproxy.security.idor import run_idor_checks
+
+    entry_id = data.get("entry_id")
+    if not entry_id:
+        raise HTTPException(status_code=400, detail="entry_id required")
+    entry = _store.get(entry_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="entry not found")
+    baseline = data.get("baseline_status", 0)
+    results = await run_idor_checks(entry, baseline_status=baseline)
+    return JSONResponse([r.to_dict() for r in results])
+
+
+# --- A/B Test ---
+
+
+class ABTestRequest(BaseModel):
+    entry_id: int
+    host_b: str
+    scheme_b: str = ""
+
+
+@app.post("/api/ab")
+async def ab_test(req: ABTestRequest) -> JSONResponse:
+    assert _store is not None
+    from pypproxy.ab_test.runner import run_ab_test
+
+    entry = _store.get(req.entry_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="entry not found")
+    result = await run_ab_test(entry, req.host_b, req.scheme_b)
+    return JSONResponse(result.to_dict())
+
+
 # --- GraphQL ---
 
 _gql_schema_store = None
